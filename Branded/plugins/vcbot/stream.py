@@ -1,3 +1,4 @@
+import logging
 from asyncio.queues import QueueEmpty
 from pyrogram import filters
 from pytgcalls.exceptions import *
@@ -8,118 +9,145 @@ from ...modules.mongo.streams import *
 from ...modules.utilities import queues
 from ...modules.utilities.streams import *
 
+# ---------------- LOGGING ----------------
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+log = logging.getLogger("player")
 
-# Audio Player
+# ---------------- AUDIO PLAYER ----------------
 
 @app.on_message(cdz(["ply", "play"]) & ~filters.private)
 @sudo_users_only
 async def audio_stream(client, message):
     chat_id = message.chat.id
+    log.info(f"[AUDIO] Triggered | chat={chat_id}")
+
     aux = await eor(message, "**Processing ...**")
-    calls = await call.calls
-    chat_call = calls.get(chat_id)
-    audio = (
-        (
-            message.reply_to_message.audio
-            or message.reply_to_message.voice
-        )
-        if message.reply_to_message else None
-    )
-    type = "Audio"
 
     try:
-        if audio:
-            await aux.edit("Downloading ...")
-            file = await client.download_media(
-                message.reply_to_message
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+        log.info(f"[AUDIO] chat_call={chat_call}")
+
+        audio = (
+            (
+                message.reply_to_message.audio
+                or message.reply_to_message.voice
             )
+            if message.reply_to_message else None
+        )
+
+        type = "Audio"
+
+        if audio:
+            log.info("[AUDIO] Reply audio detected")
+            await aux.edit("Downloading ...")
+            file = await client.download_media(message.reply_to_message)
+            log.info(f"[AUDIO] Downloaded file={file}")
         else:
             if len(message.command) < 2:
+                log.warning("[AUDIO] No query provided")
                 return await aux.edit(
                     "**🥀 ɢɪᴠᴇ ᴍᴇ sᴏᴍᴇ ǫᴜᴇʀʏ ᴛᴏ\nᴘʟᴀʏ ᴍᴜsɪᴄ ᴏʀ ᴠɪᴅᴇᴏ❗...**"
                 )
-            if "?si=" in message.text:
-                query = message.text.split(None, 1)[1].split("?si=")[0]
-            else:
-                query = message.text.split(None, 1)[1]
+
+            query = (
+                message.text.split(None, 1)[1].split("?si=")[0]
+                if "?si=" in message.text
+                else message.text.split(None, 1)[1]
+            )
+
+            log.info(f"[AUDIO] Search query={query}")
             results = await get_result(query)
+            log.info(f"[AUDIO] Results={results}")
             file = results[0]
 
         if chat_call:
             status = chat_call.status
+            log.info(f"[AUDIO] Call status={status}")
+
             if status == Call.Status.IDLE:
                 stream = await run_stream(file, type)
+                log.info("[AUDIO] Stream created")
                 await call.play(chat_id, stream)
                 await aux.edit("Playing!")
-            elif (
-                status == Call.Status.PLAYING
-                or status == Call.Status.PAUSED
-            ):
-                position = await queues.put(
-                    chat_id, file=file, type=type
-                )
+
+            elif status in (Call.Status.PLAYING, Call.Status.PAUSED):
+                position = await queues.put(chat_id, file=file, type=type)
+                log.info(f"[AUDIO] Queued at {position}")
                 await aux.edit(f"Queued At {position}")
         else:
+            log.info("[AUDIO] No call object, trying to play")
             stream = await run_stream(file, type)
+            log.info("[AUDIO] Stream created")
+
             try:
                 await call.play(chat_id, stream)
                 await aux.edit("Playing!")
             except NoActiveGroupCall:
+                log.warning("[AUDIO] No active VC")
                 return await aux.edit("No Active VC!")
-    except Exception as e:
-        print(e)
-        pass
 
+    except Exception:
+        log.exception("[AUDIO] Fatal error")
+        await aux.edit("❌ Error while playing. Check logs.")
 
-# Video Player
+# ---------------- VIDEO PLAYER ----------------
 
 @app.on_message(cdz(["vply", "vplay"]) & ~filters.private)
 @sudo_users_only
 async def video_stream(client, message):
     chat_id = message.chat.id
+    log.info(f"[VIDEO] Triggered | chat={chat_id}")
+
     aux = await eor(message, "**Processing ...**")
-    calls = await call.calls
-    chat_call = calls.get(chat_id)
-    video = (
-        (
-            message.reply_to_message.video
-            or message.reply_to_message.document
-        )
-        if message.reply_to_message else None
-    )
-    type = "Video"
+
     try:
-        if video:
-            await aux.edit("Downloading ...")
-            file = await client.download_media(
-                message.reply_to_message
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+
+        video = (
+            (
+                message.reply_to_message.video
+                or message.reply_to_message.document
             )
+            if message.reply_to_message else None
+        )
+
+        type = "Video"
+
+        if video:
+            log.info("[VIDEO] Reply video detected")
+            await aux.edit("Downloading ...")
+            file = await client.download_media(message.reply_to_message)
         else:
             if len(message.command) < 2:
                 return await aux.edit(
                     "**🥀 ɢɪᴠᴇ ᴍᴇ sᴏᴍᴇ ǫᴜᴇʀʏ ᴛᴏ\nᴘʟᴀʏ ᴍᴜsɪᴄ ᴏʀ ᴠɪᴅᴇᴏ❗...**"
                 )
-            if "?si=" in message.text:
-                query = message.text.split(None, 1)[1].split("?si=")[0]
-            else:
-                query = message.text.split(None, 1)[1]
+
+            query = (
+                message.text.split(None, 1)[1].split("?si=")[0]
+                if "?si=" in message.text
+                else message.text.split(None, 1)[1]
+            )
+
             results = await get_result(query)
             file = results[0]
 
         if chat_call:
             status = chat_call.status
+
             if status == Call.Status.IDLE:
                 stream = await run_stream(file, type)
                 await call.play(chat_id, stream)
                 await aux.edit("Playing!")
-            elif (
-                status == Call.Status.PLAYING
-                or status == Call.Status.PAUSED
-            ):
-                position = await queues.put(
-                    chat_id, file=file, type=type
-                )
+
+            elif status in (Call.Status.PLAYING, Call.Status.PAUSED):
+                position = await queues.put(chat_id, file=file, type=type)
                 await aux.edit(f"Queued At {position}")
         else:
             stream = await run_stream(file, type)
@@ -128,67 +156,66 @@ async def video_stream(client, message):
                 await aux.edit("Playing!")
             except NoActiveGroupCall:
                 return await aux.edit("No Active VC!")
-    except Exception as e:
-        print(e)
-        pass
-  
 
+    except Exception:
+        log.exception("[VIDEO] Fatal error")
+        await aux.edit("❌ Error while playing. Check logs.")
 
-
-
-# Audio Player (Play From Anywhere)
+# ---------------- PLAY FROM ANYWHERE (AUDIO) ----------------
 
 @app.on_message(cdz(["cply", "cplay"]))
 @sudo_users_only
 async def audio_stream_(client, message):
     user_id = message.from_user.id
     chat_id = await get_chat_id(user_id)
-    calls = await call.calls
-    chat_call = calls.get(chat_id)
+
     if chat_id == 0:
-        return await eor(message,
-            "**🥀 Please Set A Chat To Start Stream❗**"
-    )
+        return await eor(message, "**🥀 Please Set A Chat To Start Stream❗**")
+
     aux = await eor(message, "**Processing ...**")
-    audio = (
-        (
-            message.reply_to_message.audio
-            or message.reply_to_message.voice
-        )
-        if message.reply_to_message
-        else None
-    )
-    type = "Audio"
+
     try:
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+
+        audio = (
+            (
+                message.reply_to_message.audio
+                or message.reply_to_message.voice
+            )
+            if message.reply_to_message else None
+        )
+
+        type = "Audio"
+
         if audio:
             await aux.edit("Downloading ...")
-            file = await client.download_media(
-                message.reply_to_message
-            )
+            file = await client.download_media(message.reply_to_message)
         else:
             if len(message.command) < 2:
                 return await aux.edit(
                     "**🥀 ɢɪᴠᴇ ᴍᴇ sᴏᴍᴇ ǫᴜᴇʀʏ ᴛᴏ\nᴘʟᴀʏ ᴍᴜsɪᴄ ᴏʀ ᴠɪᴅᴇᴏ❗...**"
                 )
-            if "?si=" in message.text:
-                query = message.text.split(None, 1)[1].split("?si=")[0]
-            else:
-                query = message.text.split(None, 1)[1]
+
+            query = (
+                message.text.split(None, 1)[1].split("?si=")[0]
+                if "?si=" in message.text
+                else message.text.split(None, 1)[1]
+            )
+
             results = await get_result(query)
             file = results[0]
+
         if chat_call:
             status = chat_call.status
+
             if status == Call.Status.IDLE:
                 stream = await run_stream(file, type)
                 await call.play(chat_id, stream)
                 await aux.edit("Playing!")
-            elif (
-                status == Call.Status.PLAYING
-                or status == Call.Status.PAUSED
-            ):
-                position = await queues.put(
-                    chat_id, file=file, type=type
-                )
+
+            elif status in (Call.Status.PLAYING, Call.Status.PAUSED):
+                position = await queues.put(chat_id, file=file, type=type)
                 await aux.edit(f"Queued At {position}")
         else:
             stream = await run_stream(file, type)
@@ -197,64 +224,66 @@ async def audio_stream_(client, message):
                 await aux.edit("Playing!")
             except NoActiveGroupCall:
                 return await aux.edit("No Active VC!")
-    except Exception as e:
-        print(e)
-        pass
 
+    except Exception:
+        log.exception("[C-AUDIO] Fatal error")
+        await aux.edit("❌ Error while playing. Check logs.")
 
-# Video Player
+# ---------------- PLAY FROM ANYWHERE (VIDEO) ----------------
 
 @app.on_message(cdz(["cvply", "cvplay"]))
 @sudo_users_only
 async def video_stream_(client, message):
     user_id = message.from_user.id
     chat_id = await get_chat_id(user_id)
-    calls = await call.calls
-    chat_call = calls.get(chat_id)
+
     if chat_id == 0:
-        return await eor(message,
-            "**🥀 Please Set A Chat To Start Stream❗**"
-    )
+        return await eor(message, "**🥀 Please Set A Chat To Start Stream❗**")
+
     aux = await eor(message, "**Processing ...**")
-    video = (
-        (
-            message.reply_to_message.video
-            or message.reply_to_message.document
-        )
-        if message.reply_to_message
-        else None
-    )
-    type = "Video"
+
     try:
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+
+        video = (
+            (
+                message.reply_to_message.video
+                or message.reply_to_message.document
+            )
+            if message.reply_to_message else None
+        )
+
+        type = "Video"
+
         if video:
             await aux.edit("Downloading ...")
-            file = await client.download_media(
-                message.reply_to_message
-            )
+            file = await client.download_media(message.reply_to_message)
         else:
             if len(message.command) < 2:
                 return await aux.edit(
                     "**🥀 ɢɪᴠᴇ ᴍᴇ sᴏᴍᴇ ǫᴜᴇʀʏ ᴛᴏ\nᴘʟᴀʏ ᴍᴜsɪᴄ ᴏʀ ᴠɪᴅᴇᴏ❗...**"
                 )
-            if "?si=" in message.text:
-                query = message.text.split(None, 1)[1].split("?si=")[0]
-            else:
-                query = message.text.split(None, 1)[1]
+
+            query = (
+                message.text.split(None, 1)[1].split("?si=")[0]
+                if "?si=" in message.text
+                else message.text.split(None, 1)[1]
+            )
+
             results = await get_result(query)
             file = results[0]
+
         if chat_call:
             status = chat_call.status
+
             if status == Call.Status.IDLE:
                 stream = await run_stream(file, type)
                 await call.play(chat_id, stream)
                 await aux.edit("Playing!")
-            elif (
-                status == Call.Status.PLAYING
-                or status == Call.Status.PAUSED
-            ):
-                position = await queues.put(
-                    chat_id, file=file, type=type
-                )
+
+            elif status in (Call.Status.PLAYING, Call.Status.PAUSED):
+                position = await queues.put(chat_id, file=file, type=type)
                 await aux.edit(f"Queued At {position}")
         else:
             stream = await run_stream(file, type)
@@ -263,8 +292,7 @@ async def video_stream_(client, message):
                 await aux.edit("Playing!")
             except NoActiveGroupCall:
                 return await aux.edit("No Active VC!")
-    except Exception as e:
-        print(e)
-        pass
 
-  
+    except Exception:
+        log.exception("[C-VIDEO] Fatal error")
+        await aux.edit("❌ Error while playing. Check logs.")
