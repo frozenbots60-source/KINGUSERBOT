@@ -1,13 +1,22 @@
-asyncio==3.4.3
-GitPython
-motor==2.5.1
-py-tgcalls==2.0.1
-git+https://github.com/pyrogrammod/pyrogrammod
-python-dotenv
-telegraph
+# --- Telegram Core ---
+pyrogram==2.0.106
 tgcrypto==1.2.5
+
+# --- Voice Calls ---
+pytgcalls==3.0.0.dev24
+ntgcalls==1.2.0
+
+# --- Database ---
+motor==3.3.2
+pymongo[srv]==4.6.1
+
+# --- Utils ---
+python-dotenv
+GitPython
+telegraph
 youtube-search-python
 yt-dlp
-pymongo[srv]
+
+# --- Web (optional, keep isolated) ---
 flask
 Flask-RESTful
