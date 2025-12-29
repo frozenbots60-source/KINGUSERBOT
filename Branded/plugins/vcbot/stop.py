@@ -1,7 +1,6 @@
 import logging
 from asyncio.queues import QueueEmpty
 from pyrogram import filters
-from pytgcalls.exceptions import GroupCallNotFound
 from pytgcalls.types.calls import Call
 
 from ... import *
@@ -24,10 +23,15 @@ async def stop_stream(client, message):
     log.info(f"[STOP] Triggered | chat={chat_id}")
 
     try:
-        a = await call.get_call(chat_id)
-        log.info(f"[STOP] Call status={a.status}")
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+        log.info(f"[STOP] chat_call={chat_call}")
 
-        if a.status in (Call.Status.PLAYING, Call.Status.PAUSED):
+        if not chat_call:
+            log.warning("[STOP] Bot not in VC")
+            return await eor(message, "**I am Not in VC!**")
+
+        if chat_call.status in (Call.Status.PLAYING, Call.Status.PAUSED):
             try:
                 queues.clear(chat_id)
                 log.info("[STOP] Queue cleared")
@@ -38,13 +42,10 @@ async def stop_stream(client, message):
             log.info("[STOP] Stream stopped")
             await eor(message, "**Stream Stopped!**")
 
-        elif a.status == Call.Status.IDLE:
+        elif chat_call.status == Call.Status.IDLE:
             log.info("[STOP] Nothing playing")
             await eor(message, "**Nothing Playing!**")
 
-    except GroupCallNotFound:
-        log.warning("[STOP] Bot not in VC")
-        await eor(message, "**I am Not in VC!**")
     except Exception:
         log.exception("[STOP] Fatal error")
 
@@ -61,10 +62,15 @@ async def stop_stream_chat(client, message):
         return await eor(message, "**🥀 No Stream Chat Set❗**")
 
     try:
-        a = await call.get_call(chat_id)
-        log.info(f"[C-STOP] Call status={a.status}")
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+        log.info(f"[C-STOP] chat_call={chat_call}")
 
-        if a.status in (Call.Status.PLAYING, Call.Status.PAUSED):
+        if not chat_call:
+            log.warning("[C-STOP] Bot not in VC")
+            return await eor(message, "**I am Not in VC!**")
+
+        if chat_call.status in (Call.Status.PLAYING, Call.Status.PAUSED):
             try:
                 queues.clear(chat_id)
                 log.info("[C-STOP] Queue cleared")
@@ -75,13 +81,10 @@ async def stop_stream_chat(client, message):
             log.info("[C-STOP] Stream stopped")
             await eor(message, "**Stream Stopped!**")
 
-        elif a.status == Call.Status.IDLE:
+        elif chat_call.status == Call.Status.IDLE:
             log.info("[C-STOP] Nothing playing")
             await eor(message, "**Nothing Playing!**")
 
-    except GroupCallNotFound:
-        log.warning("[C-STOP] Bot not in VC")
-        await eor(message, "**I am Not in VC!**")
     except Exception:
         log.exception("[C-STOP] Fatal error")
 
@@ -93,27 +96,24 @@ async def close_stream_(client, message):
     log.info(f"[END] Triggered | chat={chat_id}")
 
     try:
-        a = await call.get_call(chat_id)
-        log.info(f"[END] Call status={a.status}")
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+        log.info(f"[END] chat_call={chat_call}")
 
-        if a.status in (
-            Call.Status.IDLE,
-            Call.Status.PLAYING,
-            Call.Status.PAUSED,
-        ):
-            try:
-                queues.clear(chat_id)
-                log.info("[END] Queue cleared")
-            except QueueEmpty:
-                log.info("[END] Queue already empty")
+        if not chat_call:
+            log.warning("[END] Bot not in VC")
+            return await eor(message, "**I am Not in VC!**")
 
-            await call.leave_group_call(chat_id)
-            log.info("[END] Left VC")
-            await eor(message, "**Stream Ended!**")
+        try:
+            queues.clear(chat_id)
+            log.info("[END] Queue cleared")
+        except QueueEmpty:
+            log.info("[END] Queue already empty")
 
-    except GroupCallNotFound:
-        log.warning("[END] Bot not in VC")
-        await eor(message, "**I am Not in VC!**")
+        await call.leave_group_call(chat_id)
+        log.info("[END] Left VC")
+        await eor(message, "**Stream Ended!**")
+
     except Exception:
         log.exception("[END] Fatal error")
 
@@ -130,26 +130,23 @@ async def close_stream_chat(client, message):
         return await eor(message, "**🥀 No Stream Chat Set❗**")
 
     try:
-        a = await call.get_call(chat_id)
-        log.info(f"[C-END] Call status={a.status}")
+        calls = await call.calls
+        chat_call = calls.get(chat_id)
+        log.info(f"[C-END] chat_call={chat_call}")
 
-        if a.status in (
-            Call.Status.IDLE,
-            Call.Status.PLAYING,
-            Call.Status.PAUSED,
-        ):
-            try:
-                queues.clear(chat_id)
-                log.info("[C-END] Queue cleared")
-            except QueueEmpty:
-                log.info("[C-END] Queue already empty")
+        if not chat_call:
+            log.warning("[C-END] Bot not in VC")
+            return await eor(message, "**I am Not in VC!**")
 
-            await call.leave_group_call(chat_id)
-            log.info("[C-END] Left VC")
-            await eor(message, "**Stream Ended!**")
+        try:
+            queues.clear(chat_id)
+            log.info("[C-END] Queue cleared")
+        except QueueEmpty:
+            log.info("[C-END] Queue already empty")
 
-    except GroupCallNotFound:
-        log.warning("[C-END] Bot not in VC")
-        await eor(message, "**I am Not in VC!**")
+        await call.leave_group_call(chat_id)
+        log.info("[C-END] Left VC")
+        await eor(message, "**Stream Ended!**")
+
     except Exception:
         log.exception("[C-END] Fatal error")
