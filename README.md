@@ -24,7 +24,7 @@
 <h3 align="center">
      ─「 ᴅᴇᴩʟᴏʏ ᴏɴ ʜᴇʀᴏᴋᴜ 」─
 </h3>
-<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/kustbots/KINGUSERBOT"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-black?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/frozenbots60-source/KINGUSERBOT"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-black?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
 
 
 [![GIF](https://github.com/WCGKING/WCGKING/blob/main/WCGKING.gif)](https://github.com/WCGKING)
